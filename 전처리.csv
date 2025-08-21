@@ -1,0 +1,405 @@
+
+#pip install pandas numpy matplotlib seaborn
+# 라이브러리 불러오기
+import pandas as pd
+import numpy as np
+np.set_printoptions(precision=4, suppress=True)
+import matplotlib.pyplot as plt
+import seaborn as sns
+file_path ='E:\(세미2)breastcancerdb\data\BREAST1.csv'
+file_path
+df= pd.read_csv(file_path)
+df.head()
+# 전처리
+
+
+# 분석 대상 열 목록
+columns_to_check = [
+   'Sex', 'Age', 'Race', 'Marital status', 'ER', 'HER2', 'PR',
+       'T/N/M Stage', 'Behavior code', 'Sequence number', 'Chemotherapy',
+       'Mets all', 'Mets at bone', 'Mets at brain', 'Mets at liver',
+       'Mets at lung', 'Radiation', 'Surgery Oth Reg/Dis', 'Surgery Prim Site',
+       'Rural-Urban', 'cancer treatment delay', 'Income', 'Survival months',
+       'Cancer Site'
+]
+
+# 컬럼별 고유값 카운트 출력
+for col in columns_to_check:
+    print(f"\n===== [{col}] =====")
+    print(df[col].value_counts(dropna=False))  # NaN 포함해서 카운트
+
+##RACE [True=1, False=0]
+
+df['Race'].value_counts()
+
+# Race 변수 처리
+df['Race_grouped'] = df['Race'].replace({
+    'Unknown': 'Other (Unknown/AIAN)',
+    'American Indian/Alaska Native': 'Other (Unknown/AIAN)'
+})
+
+print(df['Race_grouped'].value_counts())
+
+# Race>> Race_grouped 이름 변경
+
+# Race_grouped만 원-핫 인코딩
+race_dummies = pd.get_dummies(df['Race_grouped'], prefix='Race')
+
+
+print(race_dummies)
+
+
+
+# 원-핫 인코딩 후 0/1 숫자로 변환
+marital_dummies = pd.get_dummies(df['Race_grouped'], prefix='Race').astype(int)
+
+print(marital_dummies)
+
+##SEX [Male: 0, 'Female:1 ]
+
+
+
+df['Sex'].value_counts()
+
+df['Sex'] = df['Sex'].map({'Male': 0, 'Female': 1})
+
+print(df['Sex'].value_counts())
+
+##AGE(연속형 그대로 사용)
+
+df['Age'].value_counts()
+
+
+
+# Age 그룹화 함수
+def age_group(age):
+    if age <= 29:
+        return "0-29"
+    elif age >= 85:
+        return "85+"
+    else:
+        return f"{(age//5)*5}-{(age//5)*5 + 4}"
+
+# 숫자만 추출 후 그룹화
+df['Age_group'] = df['Age'].str.extract(r'(\d+)').astype(int)[0].apply(age_group)
+
+print(df['Age_group'].value_counts().sort_index())
+
+# Age>> Age_group 이름 변경
+
+## Marital [True=1, False=0]
+
+df['Marital status'].value_counts()
+
+# 매핑 딕셔너리 정의
+marital_map = {
+    'Married (including common law)': 'Married',
+    'Divorced': 'Previously Married',
+    'Separated': 'Previously Married',
+    'Widowed': 'Previously Married',
+    'Never married': 'Single/Other',
+    'Unknown': 'Single/Other',
+    'Unmarried or Domestic Partner': 'Single/Other'
+}
+
+# 새 컬럼 생성
+df['Marital_group'] = df['Marital status'].replace(marital_map)
+
+# 결과 확인
+print(df['Marital_group'].value_counts())
+
+#Marital_group 로 이름 변경
+
+# Marital_group만 원-핫 인코딩
+marital_dummies = pd.get_dummies(df['Marital_group'], prefix='Marital')
+
+print(marital_dummies)
+
+# 원-핫 인코딩 후 0/1 숫자로 변환
+marital_dummies = pd.get_dummies(df['Marital_group'], prefix='Marital').astype(int)
+
+print(marital_dummies)
+
+##Income(연속형 그대로 사용)
+
+df['Income'].value_counts()
+
+# 1. Unknown 제거
+df = df[df['Income'] != 'Unknown/missing/no match/Not 1990-2023']
+
+# $ 제거
+df['Income'] = df['Income'].str.replace('$', '', regex=False)
+
+print(df['Income'].value_counts())
+
+##Rural-Urban [True=1, False=0]
+
+df['Rural-Urban'].value_counts()
+
+df = df[~df['Rural-Urban'].str.contains("Unknown/missing")]
+
+def group_urban_rural(x):
+    if 'Large Metro' in x:
+        return 'Large metro'
+    elif 'metropolitan areas of' in x:
+        return 'Small/Medium metro'
+    else:
+        return 'Rural'
+
+df['Rural-Urban_grouped'] = df['Rural-Urban'].apply(group_urban_rural)
+
+print(df['Rural-Urban_grouped'].value_counts())
+
+# Race_grouped만 원-핫 인코딩
+race_dummies = pd.get_dummies(df['Rural-Urban_grouped'], prefix='Rural-Urban')
+
+
+print(race_dummies)
+
+# 원-핫 인코딩 후 0/1 숫자로 변환
+marital_dummies = pd.get_dummies(df['Rural-Urban_grouped'], prefix='Rural-Urban').astype(int)
+
+print(marital_dummies)
+
+##Behavior code [In situ=1, Malignant=0]
+
+df['Behavior code'].value_counts()
+
+mapping = {'In situ': 1, 'Malignant': 0}
+df['Behavior_code_num'] = df['Behavior code'].map(mapping)
+
+print(df['Behavior_code_num'].value_counts())
+
+
+
+##T/N/M Stage [Stage_Number=0,1,2,3,4]
+
+df = pd.read_csv(file_path)
+print(df.columns)
+
+df['T/N/M Stage'].value_counts()
+
+def extract_stage_number(stage):
+    import re
+    match = re.search(r'\d', stage)
+    if match:
+        return int(match.group())
+    else:
+        return 0
+
+df['Stage_Number'] = df['T/N/M Stage'].apply(extract_stage_number)
+
+
+print(df['Stage_Number'].value_counts())
+
+##Therapy
+
+###Surg Prim Site(수치형)
+
+
+df = pd.read_csv(file_path)
+print(df.columns)
+
+df['Surgery Prim Site'].value_counts()
+
+def surgery_group(code):
+    try:
+        code_int = int(code)
+    except ValueError:
+        return None  # 숫자로 변환 안되는 값은 제외
+
+    if code_int == 0:
+        return 0
+    elif 10 <= code_int <= 39:
+        return 1
+    elif 40 <= code_int <= 69:
+        return 2
+    elif 70 <= code_int <= 80:
+        return 3
+    else:
+        return None  # 80 이상 또는 범위 밖은 제외
+
+# 예시: Surgery Prim Site 코드에 적용
+df['Surgery_Group'] = df['Surgery Prim Site'].apply(surgery_group)
+
+# 80 이상 등 그룹이 None인 행은 삭제하고 싶으면:
+df = df[df['Surgery_Group'].notna()]
+
+df['Surgery_Group'].value_counts()
+
+###Surgery Oth Reg/Dis [Yes=1, No=0]
+
+df['Surgery Oth Reg/Dis'].value_counts()
+
+df = df[df['Surgery Oth Reg/Dis'] != 'Unknown; death certificate only']
+# '9'이 포함된 값 무시 (실제 데이터에 '9'가 있으면 아래 라인 활성화)
+# df = df[~df['Surgery Oth Reg/Dis'].str.contains('9')]
+
+# 수술 그룹 분류 함수
+def surgery_other_group(value):
+    if value == '0' or value == 'None; diagnosed at autopsy':
+        return 0  # 수술 없음
+    elif value in [
+        'Non-primary surgical procedure performed',
+        'Non-primary surgical procedure to other regional sites',
+        'Non-primary surgical procedure to distant site',
+        'Non-primary surgical procedure to distant lymph node(s)',
+        'Any combo of sur proc to oth rg, dis lym nd, and/or dis site'
+        ]:
+        return 1  # 수술 있음 (2~6번 범주 모두 포함)
+    else:
+        return None  # 관심 없는 값(예: 9 등)
+
+df['Surgery_Reg_Group'] = df['Surgery Oth Reg/Dis'].apply(surgery_other_group)
+
+# None인 행 제거
+df = df[df['Surgery_Reg_Group'].notna()]
+
+
+print(df['Surgery_Reg_Group'].value_counts())
+
+### Radiation[Yes=1, No=0]
+
+###Chemotherapy[Yes=1, No=0]
+
+df['Chemotherapy'].value_counts()
+
+def chemo_binary(value):
+    if value == 'No/Unknown':
+        return 0
+    elif value == 'Yes':
+        return 1
+    else:
+        return None  # 혹시 다른 값은 None 처리
+
+df['Chemo_Binary'] = df['Chemotherapy'].apply(chemo_binary)
+
+print(df['Chemo_Binary'].value_counts())
+
+##Cancer treatment delay(연속형 그대로 사용)
+
+
+
+df['cancer treatment delay'].value_counts()
+
+##EOD
+
+###Mets at Bone [Yes=1, No=0]
+
+df['Mets at bone'].value_counts()
+
+def chemo_binary(value):
+    if value == 'No':
+        return 0
+    elif value == 'Yes':
+        return 1
+    else:
+        return None  # 혹시 다른 값은 None 처리
+
+df['Mets_bone'] = df['Mets at bone'].apply(chemo_binary)
+df = df[df['Mets_bone'].notna()]
+print(df['Mets_bone'].value_counts())
+
+###Mets at Brain [Yes=1, No=0]
+
+df['Mets at brain'].value_counts()
+
+def chemo_binary(value):
+    if value == 'No':
+        return 0
+    elif value == 'Yes':
+        return 1
+    else:
+        return None  # 혹시 다른 값은 None 처리
+
+df['Mets_brain'] = df['Mets at brain'].apply(chemo_binary)
+df = df[df['Mets_brain'].notna()]
+print(df['Mets_brain'].value_counts())
+
+###Mets at Liver [Yes=1, No=0]
+
+df['Mets at liver'].value_counts()
+
+def chemo_binary(value):
+    if value == 'No':
+        return 0
+    elif value == 'Yes':
+        return 1
+    else:
+        return None  # 혹시 다른 값은 None 처리
+
+df['Mets_liver'] = df['Mets at liver'].apply(chemo_binary)
+df = df[df['Mets_liver'].notna()]
+print(df['Mets_liver'].value_counts())
+
+###Mets at Lung [Yes=1, No=0]
+
+df['Mets at lung'].value_counts()
+
+def chemo_binary(value):
+    if value == 'No':
+        return 0
+    elif value == 'Yes':
+        return 1
+    else:
+        return None  # 혹시 다른 값은 None 처리
+
+df['Mets_lung'] = df['Mets at lung'].apply(chemo_binary)
+df = df[df['Mets_lung'].notna()]
+print(df['Mets_lung'].value_counts())
+
+#ER,PR,HER(pos=1,neg=0)
+
+##ER
+
+df['ER'].value_counts()
+
+df['ER'] = df['ER'].map({'Positive': 1, 'Negative': 0})
+
+print(df['ER'].value_counts())
+
+##PR
+
+df['PR'].value_counts()
+
+df['PR'] = df['PR'].map({'Positive': 1, 'Negative': 0})
+
+print(df['PR'].value_counts())
+
+##HER2
+
+df['HER2'].value_counts()
+
+df['HER2'] = df['HER2'].map({'Positive': 1, 'Negative': 0})
+
+print(df['HER2'].value_counts())
+
+#Survival months(수치형)
+
+#Sequence number
+
+### First VS Later[first=1,else=0]
+
+df['Sequence number'].value_counts()
+
+def first_vs_later(value):
+    if value == 'One primary only':
+        return None  # 제외
+    elif value == '1st of 2 or more primaries':
+        return 1
+    else:
+        return 0
+
+# 적용
+df['First_vs_Later'] = df['Sequence number'].apply(first_vs_later)
+
+# None인 행 삭제
+df = df[df['First_vs_Later'].notna()]
+print(df["First_vs_Later"].value_counts())
+
+### One VS Other[one=1,other=0]
+
+df["One_vs_Other"] = df["Sequence number"].apply(
+    lambda x: 1 if x == "One primary only" else 0
+)
+print(df["One_vs_Other"].value_counts())
